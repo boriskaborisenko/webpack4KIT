@@ -1,16 +1,13 @@
-
-
-
 var config = {
     type: Phaser.AUTO,
     parent: 'game',
-    backgroundColor: '#ff303f',
+    backgroundColor: '#75C7EB',
     width: 800,
     height: 600,
     physics: {
         default: 'arcade',
         arcade: {
-            gravity: { y: 300 },
+            gravity: { y: 0 },
             debug: false
         }
     },
@@ -21,173 +18,127 @@ var config = {
     }
 };
 
-
-
+var self;
 var player;
-var stars;
-var bombs;
-var platforms;
-var cursors;
-var score = 0;
-var gameOver = false;
-var scoreText;
-
+var keys;
+var pipe;
+var pipes;
+var pointpipe;
+var pointpipes;
+var clear;
+var mypoints = 0;
+var pppbg;
+var newbg;
 var game = new Phaser.Game(config);
 
 function preload ()
 {
-    this.load.image('sky', 'assets/sky.png');
-    this.load.image('ground', 'assets/platform.png');
     this.load.image('star', 'assets/star.png');
     this.load.image('bomb', 'assets/bomb.png');
-    this.load.spritesheet('dude', 'assets/dude.png', { frameWidth: 32, frameHeight: 48 });
+    this.load.image('block', 'assets/block.png');
+    this.load.image('hole', 'assets/hole.png');
+    this.load.image('bg', 'assets/bg.png');
+    this.load.spritesheet('bird', 'assets/bird.png', { frameWidth: 36, frameHeight: 26 });
+    
 }
 
 function create ()
 {
-    //  A simple background for our game
-    this.add.image(400, 300, 'sky');
+    self = this;
+    this.score = this.add.text(16, 16, 'Score: 0', { fontFamily: 'Mali', fontSize: '32px', fill: '#fff' });
+    this.score.setDepth(100);
+    //this.add.image(0, 0, 'bg').setOrigin(0);
+    
+    player = this.physics.add.sprite(350, 450, 'bird');
+    
+    clear = this.physics.add.image(-102, 0, 'clear').setOrigin(0).setDisplaySize(1, 800);
 
-    //  The platforms group contains the ground and the 2 ledges we can jump on
-    platforms = this.physics.add.staticGroup();
-
-    //  Here we create the ground.
-    //  Scale it to fit the width of the game (the original sprite is 400x32 in size)
-    platforms.create(400, 568, 'ground').setScale(2).refreshBody();
-
-    //  Now let's create some ledges
-    platforms.create(600, 400, 'ground');
-    platforms.create(50, 250, 'ground');
-    platforms.create(750, 220, 'ground');
-
-    // The player and its settings
-    player = this.physics.add.sprite(100, 450, 'dude');
+    this.anims.create({
+        key: 'fly',
+        frames: this.anims.generateFrameNumbers('bird', { start: 0, end: 2 }),
+        frameRate: 10,
+        repeat: 0
+    });
+    
 
     //  Player physics properties. Give the little guy a slight bounce.
-    player.setBounce(0.2);
-    player.setCollideWorldBounds(true);
+    //player.setBounce(0.2);
+    player.setGravity(0, 600);
+    player.setDepth(2);
+    player.setCollideWorldBounds(true); 
+    keys = this.input.keyboard.addKeys('Space');
 
-    //  Our player animations, turning, walking left and walking right.
-    this.anims.create({
-        key: 'left',
-        frames: this.anims.generateFrameNumbers('dude', { start: 0, end: 3 }),
-        frameRate: 10,
-        repeat: -1
-    });
+    this.pipes = this.add.group();
+    this.pointpipes = this.add.group();
+    
 
-    this.anims.create({
-        key: 'turn',
-        frames: [ { key: 'dude', frame: 4 } ],
-        frameRate: 20
-    });
-
-    this.anims.create({
-        key: 'right',
-        frames: this.anims.generateFrameNumbers('dude', { start: 5, end: 8 }),
-        frameRate: 10,
-        repeat: -1
-    });
-
-    //  Input Events
-    cursors = this.input.keyboard.createCursorKeys();
-
-    //  Some stars to collect, 12 in total, evenly spaced 70 pixels apart along the x axis
-    stars = this.physics.add.group({
-        key: 'star',
-        repeat: 11,
-        setXY: { x: 12, y: 0, stepX: 70 }
-    });
-
-    stars.children.iterate(function (child) {
-
-        //  Give each star a slightly different bounce
-        child.setBounceY(Phaser.Math.FloatBetween(0.4, 0.8));
-
-    });
-
-    bombs = this.physics.add.group();
-
-    //  The score
-    scoreText = this.add.text(16, 16, 'score: 0', { fontFamily:'Mali', fontSize: '42px', fill: '#229fff' });
-
-    //  Collide the player and the stars with the platforms
-    this.physics.add.collider(player, platforms);
-    this.physics.add.collider(stars, platforms);
-    this.physics.add.collider(bombs, platforms);
-
-    //  Checks to see if the player overlaps with any of the stars, if he does call the collectStar function
-    this.physics.add.overlap(player, stars, collectStar, null, this);
-
-    this.physics.add.collider(player, bombs, hitBomb, null, this);
-}
-
-function update ()
-{
-    if (gameOver)
-    {
-        return;
-    }
-
-    if (cursors.left.isDown)
-    {
-        player.setVelocityX(-160);
-
-        player.anims.play('left', true);
-    }
-    else if (cursors.right.isDown)
-    {
-        player.setVelocityX(160);
-
-        player.anims.play('right', true);
-    }
-    else
-    {
-        player.setVelocityX(0);
-
-        player.anims.play('turn');
-    }
-
-    if (cursors.up.isDown && player.body.touching.down)
-    {
-        player.setVelocityY(-330);
-    }
-}
-
-function collectStar (player, star)
-{
-    star.disableBody(true, true);
-
-    //  Add and update the score
-    score += 10;
-    scoreText.setText('Score: ' + score);
-
-    if (stars.countActive(true) === 0)
-    {
-        //  A new batch of stars to collect
-        stars.children.iterate(function (child) {
-
-            child.enableBody(true, child.x, 0, true, true);
-
+        this.timedEvent = this.time.addEvent({
+            delay: 1700,
+            callback: addPipeRows,
+            callbackScope: this,
+            loop: true
         });
 
-        var x = (player.x < 400) ? Phaser.Math.Between(400, 800) : Phaser.Math.Between(0, 400);
+        
+        this.pppbg = this.add.group();
+        for (let i = 0; i < 100; i++) {
+            console.log(i)
+            newbg = this.physics.add.image(648*i, 0, 'bg').setVelocity(-30, 0).setOrigin(0).setDepth(1);
+            this.pppbg.add(newbg);
+        }
 
-        var bomb = bombs.create(x, 16, 'bomb');
-        bomb.setBounce(1);
-        bomb.setCollideWorldBounds(true);
-        bomb.setVelocity(Phaser.Math.Between(-200, 200), 20);
-        bomb.allowGravity = false;
+     
+        this.physics.add.overlap(clear, this.pipes.children.entries, destroyPipe, null, this);
+        this.physics.add.overlap(clear, this.pointpipes.children.entries, destroyPipe, null, this);
+        
+        this.physics.add.overlap(player, this.pointpipes.children.entries, playPipe, null, this);
+   
+    
+    
+}
 
+function destroyPipe(clear, pipe){
+    pipe.destroy();
+}
+
+function playPipe(player, pointpipe,score){
+    mypoints++;
+    self.score.text = 'Score: '+mypoints;
+}
+
+function addPipes(type, x, y) {
+    if(type=='hole'){
+        pointpipe = self.physics.add.image(x, y, type ).setVelocity(-300, 0).setDepth(3);
+        self.pointpipes.add(pointpipe);
+    }else{
+        pipe = self.physics.add.image(x, y, type ).setVelocity(-300, 0).setDepth(3);
+        self.pipes.add(pipe);
+    }
+    
+} 
+
+function addPipeRows() {
+    let hole = Math.floor(Math.random() * 5) + 1;
+    let type;
+    
+
+    for (let i = 0; i < 11; i++) {
+        
+        if (i != hole && i != hole+1) {
+            type = 'block';
+        }else{
+            type = 'hole';
+        }
+        addPipes(type, 800, i * 60 + 10);
+    }
+    
+}
+
+function update(){
+    if(keys.Space.isDown){
+        player.setVelocityY(-250);
+        player.play('fly', true);
     }
 }
 
-function hitBomb (player, bomb)
-{
-    this.physics.pause();
 
-    player.setTint(0xff0000);
-
-    player.anims.play('turn');
-
-    gameOver = true;
-}
